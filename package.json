@@ -1,0 +1,33 @@
+{
+  "name": "bram-bot",
+  "version": "1.0.0",
+  "description": "BRAM IS HERE — WhatsApp Bot Full Version",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "pm2": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop bram-bot",
+    "pm2:logs": "pm2 logs bram-bot"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.6.0",
+    "pino": "8.17.2",
+    "qrcode-terminal": "0.12.0",
+    "@hapi/boom": "10.0.1",
+    "axios": "1.6.0",
+    "chalk": "5.3.0",
+    "dotenv": "16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "whatsapp-bot",
+    "baileys",
+    "whatsapp-md",
+    "bram-bot"
+  ],
+  "author": "BRAM IS HERE",
+  "license": "MIT"
+}
