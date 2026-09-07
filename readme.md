@@ -22,5 +22,5 @@ Bot WhatsApp Multi-Device dengan fitur lengkap: bug WhatsApp, download YouTube, 
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/username/bram-bot.git
+git clone https://github.com/bram2008/bram-bot.git
 cd bram-bot
