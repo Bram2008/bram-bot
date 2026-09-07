@@ -1,14 +1,18 @@
 // ================================================================
-// BRAM IS HERE — WHATSAPP BOT FULL VERSION
+// IMPORT BAILEYS — CARA SIMPLE
 // ================================================================
 
-import makeWASocket, {
+import makeWASocket from '@whiskeysockets/baileys';
+import * as Baileys from '@whiskeysockets/baileys';
+
+const {
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestWaWebVersion,
     generateWAMessageFromContent,
     downloadMediaMessage,
-} from '@whiskeysockets/baileys';
+} = Baileys;
+
 import pino from 'pino';
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
