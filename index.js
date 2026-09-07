@@ -1,11 +1,15 @@
 // ================================================================
-// BRAM IS HERE — VERSI PASTI JALAN (COPY INI SEMUA)
+// BRAM IS HERE — VERSI PASTI JALAN
 // ================================================================
 
-import makeWASocket from '@whiskeysockets/baileys';
-import * as Baileys from '@whiskeysockets/baileys';
-
-const { useMultiFileAuthState, DisconnectReason, fetchLatestWaWebVersion } = Baileys;
+// CARA IMPORT YANG PALING AMAN
+import pkg from '@whiskeysockets/baileys';
+const { 
+    default: makeWASocket, 
+    useMultiFileAuthState, 
+    DisconnectReason, 
+    fetchLatestWaWebVersion 
+} = pkg;
 
 import pino from 'pino';
 import { Boom } from '@hapi/boom';
@@ -35,6 +39,152 @@ console.log(`
 function askQuestion(query) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     return new Promise(resolve => rl.question(query, ans => { rl.close(); resolve(ans); }));
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+function formatNumber(number) { return number.replace(/\D/g, ''); }
+
+process.on('uncaughtException', (error) => { console.log('⚠️ Error:', error.message); });
+process.on('unhandledRejection', (reason) => { console.log('⚠️ Rejection:', reason); });
+process.on('SIGINT', () => { console.log('\n👋 Bot dimatikan!'); process.exit(0); });
+
+async function connectToWhatsApp() {
+    try {
+        // Hapus auth_info lama
+        try {
+            if (fs.existsSync('auth_info')) {
+                fs.rmSync('auth_info', { recursive: true, force: true });
+                console.log('🧹 Folder auth_info lama dihapus');
+            }
+        } catch (e) {}
+
+        console.log('\n📱 *LOGIN WHATSAPP BOT*');
+        console.log('='.repeat(40));
+        console.log('Pilih metode login:');
+        console.log('1. Scan QR Code (otomatis)');
+        console.log('2. Pairing Code (masukkan nomor)');
+        console.log('='.repeat(40));
+
+        const choice = await askQuestion('Pilih metode (1/2): ');
+        let phoneNumber = '';
+        if (choice === '2') {
+            phoneNumber = await askQuestion('📱 Masukkan nomor HP (contoh: 628123456789): ');
+            phoneNumber = formatNumber(phoneNumber);
+        }
+
+        if (!fs.existsSync('auth_info')) {
+            fs.mkdirSync('auth_info');
+            console.log('📁 Folder auth_info dibuat');
+        }
+
+        const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+        const { version } = await fetchLatestWaWebVersion();
+        console.log(`📱 WhatsApp Version: ${version.join('.')}`);
+
+        const sock = makeWASocket({
+            version,
+            logger: pino({ level: 'silent' }),
+            printQRInTerminal: true,
+            auth: state,
+            browser: ['BRAM IS HERE', 'Chrome', '20.0.0'],
+            markOnlineOnConnect: true,
+        });
+
+        sock.ev.on('creds.update', saveCreds);
+
+        if (choice === '2' && phoneNumber) {
+            console.log(`\n⏳ Meminta pairing code untuk ${phoneNumber}...`);
+            try {
+                const code = await sock.requestPairingCode(phoneNumber);
+                console.log(`\n🔑 *PAIRING CODE: ${code}*`);
+                console.log('📱 Buka WhatsApp → Settings → Linked Devices → Link with Phone Number');
+                console.log(`📱 Masukkan kode: ${code}\n`);
+                fs.writeFileSync('pairing_code.txt', `Kode: ${code}\nNomor: ${phoneNumber}\nTanggal: ${new Date().toISOString()}`);
+            } catch (err) {
+                console.log('❌ Error pairing:', err.message);
+            }
+        }
+
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            if (qr) {
+                console.log('\n📱 *SCAN QR CODE:*');
+                qrcode.generate(qr, { small: true });
+                console.log('\n📱 Buka WhatsApp → Settings → Linked Devices → Link a Device\n');
+            }
+            if (connection === 'close') {
+                const shouldReconnect = (lastDisconnect?.error instanceof Boom) &&
+                    lastDisconnect.error.output?.statusCode !== DisconnectReason.loggedOut;
+                if (shouldReconnect) {
+                    console.log('⏳ Reconnecting...');
+                    setTimeout(connectToWhatsApp, 5000);
+                } else {
+                    console.log('👋 Logout, hapus folder auth_info untuk login ulang');
+                }
+            }
+            if (connection === 'open') {
+                console.log('\n✅ BRAM IS HERE AKTIF!');
+                console.log(`📌 Prefix: ${config.prefix}\n`);
+                try {
+                    await sock.sendMessage(config.ownerNumber + '@s.whatsapp.net', {
+                        text: `🤖 *BRAM IS HERE AKTIF!*\n📌 Prefix: ${config.prefix}`
+                    });
+                } catch (e) {}
+            }
+        });
+
+        sock.ev.on('messages.upsert', async ({ messages }) => {
+            const msg = messages[0];
+            if (!msg.message || msg.key.fromMe) return;
+            const remoteJid = msg.key.remoteJid;
+            let text = msg.message.conversation ||
+                msg.message.extendedTextMessage?.text ||
+                msg.message.imageMessage?.caption ||
+                msg.message.videoMessage?.caption || '';
+            if (!text || !text.startsWith(config.prefix)) return;
+            const args = text.slice(config.prefix.length).trim().split(/\s+/);
+            const command = args.shift().toLowerCase();
+            console.log(`📨 ${command}`);
+
+            if (command === 'ping') {
+                await sock.sendMessage(remoteJid, { text: '🏓 Pong! BRAM IS HERE aktif!' });
+            } else if (command === 'menu' || command === 'help') {
+                await sock.sendMessage(remoteJid, { text: `
+╔══════════════════════════════════════════════════════════════════╗
+║          🤖 BRAM IS HERE — MENU                               ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                   ║
+║  🔥 *PERINTAH:*                                                 ║
+║  !ping       → Cek status bot                                  ║
+║  !menu       → Tampilkan menu ini                              ║
+║  !info       → Info bot & owner                               ║
+║  !say <text> → Bot ngomong                                   ║
+║                                                                   ║
+╚══════════════════════════════════════════════════════════════════╝
+                ` });
+            } else if (command === 'info') {
+                await sock.sendMessage(remoteJid, { text: `🤖 *BRAM IS HERE*\n📌 Prefix: ${config.prefix}\n👤 Owner: ${config.ownerNumber}\n⚡ Status: Online` });
+            } else if (command === 'say') {
+                if (args.length === 0) {
+                    await sock.sendMessage(remoteJid, { text: `❌ Gunakan: !say <teks>` });
+                } else {
+                    await sock.sendMessage(remoteJid, { text: args.join(' ') });
+                }
+            } else {
+                await sock.sendMessage(remoteJid, { text: `❌ Perintah tidak dikenal.\nKetik !menu untuk melihat perintah.` });
+            }
+        });
+
+        return sock;
+    } catch (error) {
+        console.log('❌ Connection Error:', error.message);
+        console.log('⏳ Reconnecting in 5 seconds...');
+        setTimeout(connectToWhatsApp, 5000);
+    }
+}
+
+console.log('🚀 Bot siap dijalankan...\n');
+connectToWhatsApp().catch(console.error);    return new Promise(resolve => rl.question(query, ans => { rl.close(); resolve(ans); }));
 }
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
